@@ -20,7 +20,7 @@ setup(
     license='MIT',
     packages=find_packages(),
     description='QtRequestClient',
-    url='',
+    url='https://github.com/SHADR1N/http-client-qt.git',
     long_description_content_type='text/markdown',
     long_description=long_description,
     install_requires=[]
