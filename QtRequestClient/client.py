@@ -87,10 +87,14 @@ class QtHttpClient(QObject):
         url = QUrl(url)
         request = QNetworkRequest(url)
         request.setHeader(QNetworkRequest.ContentTypeHeader, "application/json")
-        authorization_header = "Bearer " + self.access_token
-        request.setRawHeader(b"Authorization", authorization_header.encode())
+        if self.access_token:
+            authorization_header = "Bearer " + self.access_token
+            request.setRawHeader(b"Authorization", authorization_header.encode())
+
         request.setRawHeader(b"User-Agent", b"Application")
-        request.setRawHeader(b"Accept-language", self.lang.encode())
+
+        if self.lang:
+            request.setRawHeader(b"Accept-language", self.lang.encode())
 
         for key, param in headers.items():
             request.setRawHeader(key.encode(), param.encode())
