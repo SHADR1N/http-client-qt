@@ -33,19 +33,57 @@ class QtHttpClient(QObject):
         self.access_token = access_token
         self.network_manager = QNetworkAccessManager()
 
-    def get(self, url, timeout: int = 3, send_result: Any = None):
-        self.send_request(method="GET", url=url, timeout=timeout, send_result=send_result)
+    def get(
+            self,
+            url,
+            timeout: int = 3,
+            send_result: Any = None,
+            headers: dict = None
+    ):
+        self.send_request(method="GET", url=url, timeout=timeout, send_result=send_result, headers=headers)
 
-    def post(self, url, timeout: int = 3, data: Union[str, dict, list] = None, send_result: Any = None):
-        self.send_request(method="POST", url=url, timeout=timeout, parameters=data, send_result=send_result)
+    def post(
+            self,
+            url,
+            timeout: int = 3,
+            data: Union[str, dict, list] = None,
+            send_result: Any = None,
+            headers: dict = None
+    ):
+        self.send_request(method="POST", url=url, timeout=timeout, parameters=data, send_result=send_result, headers=headers)
 
-    def put(self, url, timeout=3, data: Union[str, dict, list] = None, send_result: Any = None):
-        self.send_request(method="PUT", url=url, timeout=timeout, parameters=data, send_result=send_result)
+    def put(
+            self,
+            url,
+            timeout: int = 3,
+            data: Union[str, dict, list] = None,
+            send_result: Any = None,
+            headers: dict = None
+    ):
+        self.send_request(method="PUT", url=url, timeout=timeout, parameters=data, send_result=send_result, headers=headers)
 
-    def delete(self, url, timeout: int = 3, data: Union[str, dict, list] = None, send_result: str = None):
-        self.send_request(method="DELETE", url=url, timeout=timeout, parameters=data, send_result=send_result)
+    def delete(
+            self,
+            url,
+            timeout: int = 3,
+            data: Union[str, dict, list] = None,
+            send_result: str = None,
+            headers: dict = None
+    ):
+        self.send_request(method="DELETE", url=url, timeout=timeout, parameters=data, send_result=send_result, headers=headers)
 
-    def send_request(self, method, url: str, parameters: Union[str, dict, list] = None, timeout: int = None, send_result: Any = None):
+    def send_request(
+            self,
+            method,
+            url: str,
+            parameters: Union[str, dict, list] = None,
+            timeout: int = None,
+            send_result: Any = None,
+            headers: dict = None
+    ):
+        if not headers:
+            headers = {}
+
         url = QUrl(url)
         request = QNetworkRequest(url)
         request.setHeader(QNetworkRequest.ContentTypeHeader, "application/json")
@@ -53,6 +91,9 @@ class QtHttpClient(QObject):
         request.setRawHeader(b"Authorization", authorization_header.encode())
         request.setRawHeader(b"User-Agent", b"Application")
         request.setRawHeader(b"Accept-language", self.lang.encode())
+
+        for key, param in headers.items():
+            request.setRawHeader(key.encode(), param.encode())
 
         if parameters:
             data = bytes(str(json.dumps(parameters)), encoding="utf-8")
