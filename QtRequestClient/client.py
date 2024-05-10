@@ -4,17 +4,13 @@ import json
 
 from typing import Any, Union
 
-modules = sys.modules
-if "PyQt5" in modules:
+try:
     from PyQt5.QtCore import QUrl, QObject, QTimer
     from PyQt5.QtCore import pyqtSignal as Signal
     from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
-
-elif "PySide6" in modules:
+except ImportError:
     from PySide6.QtCore import QUrl, QObject, QTimer, Signal
     from PySide6.QtNetwork import QNetworkRequest, QNetworkReply, QNetworkAccessManager
-else:
-    raise ImportError("Qt not found packages")
 
 
 class QtHttpClient(QObject):
