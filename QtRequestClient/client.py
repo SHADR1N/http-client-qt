@@ -22,12 +22,15 @@ class QtHttpClient(QObject):
     }
 
     cancel = Signal(object)
+    downloading_progress = Signal(int)
 
     def __init__(self, access_token="", lang="en", parent=None):
         super().__init__(parent=parent)
+        self.responses = []
         self.lang = lang
         self.access_token = access_token
         self.network_manager = QNetworkAccessManager()
+        self.total_size = 0
 
     def get(
             self,
@@ -100,7 +103,10 @@ class QtHttpClient(QObject):
         else:
             data = None
 
-        if method == "GET":
+        self.make_request(method, request, send_result=send_result, timeout=timeout, data=data)
+
+    def make_request(self, method, request, send_result=None, timeout=None, data=None, progress=False):
+        if method == "GET" or method == "HEAD":
             reply = self.network_manager.get(request)
         elif method == "POST":
             reply = self.network_manager.post(request, data)
@@ -120,6 +126,23 @@ class QtHttpClient(QObject):
 
         # Connect the finished signal to the function handling the response
         reply.finished.connect(functools.partial(self.handle_response, reply, send_result))
+        if progress is True:
+            reply.metaDataChanged.connect(functools.partial(self.update_total_size, reply))
+            reply.downloadProgress.connect(self.handle_progress)
+
+    def update_total_size(self, reply):
+        self.total_size = int(reply.header(QNetworkRequest.ContentLengthHeader))
+
+    def handle_progress(self, bytes_received, bytes_total):
+        bytes_total = self.total_size
+
+        if bytes_total <= 0:
+            bytes_total = 1
+        if bytes_received <= 0:
+            bytes_received = 1
+
+        percent = int((bytes_received / bytes_total) * 100)
+        self.downloading_progress.emit(percent)
 
     def handle_timeout(self, reply, timer):
         reply.abort()
@@ -128,20 +151,39 @@ class QtHttpClient(QObject):
 
     def handle_response(self, reply: QNetworkReply, send_result=None):
         status_code = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute)
-        if reply.error() == QNetworkReply.NetworkError.NoError:
-            data = reply.readAll().data()
+
+        if reply.error() in (QNetworkReply.NetworkError.NoError,):
+            if status_code in (301, 302):
+                # Получаем новый URL из заголовка "Location"
+                redirect_url: QNetworkRequest.Attribute = reply.attribute(QNetworkRequest.RedirectionTargetAttribute)
+
+                if redirect_url.isValid():
+                    # Повторяем запрос с новым URL
+                    self.make_request("GET", QNetworkRequest(redirect_url), send_result=send_result, progress=True)
+                    return
+
+            all_data = reply.readAll()
+            data = all_data.data()
+
+            # Попытка декодировать данные как UTF-8
             try:
-                result = json.loads(data.decode("utf-8"))
-                self.cancel.emit(result)
-                if send_result:
-                    send_result(result)
-            except BaseException as ex:
-                print(ex.__class__.__name__ + str(ex))
-                error = data.decode("utf-8")
-                result = {"error": error}
-                self.cancel.emit(result)
-                if send_result:
-                    send_result(result)
+                decoded_data = data.decode("utf-8")
+                # Попытка сериализовать данные как JSON
+                try:
+                    json_data = json.loads(decoded_data)
+                    result = json_data  # Данные можно сериализовать в JSON
+                except json.JSONDecodeError:
+                    result = decoded_data  # Данные текстовые, но не JSON
+                    if not result:
+                        raise ZeroDivisionError
+            except (UnicodeDecodeError, ZeroDivisionError):
+                result = all_data
+
+            # Передача результата
+            self.cancel.emit(result)
+            if send_result:
+                send_result(result)
+
         else:
 
             string = reply.errorString()
@@ -156,5 +198,3 @@ class QtHttpClient(QObject):
             self.cancel.emit(result)
             if send_result:
                 send_result(result)
-
-
