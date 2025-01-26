@@ -2,18 +2,22 @@ import sys
 import functools
 import json
 
-from typing import Any, Union
+from typing import Any, Union, Callable, Optional
+
+from QtRequestClient.handlers import Handlers
 
 try:
-    from PyQt5.QtCore import QUrl, QObject, QTimer
+    from PyQt5.QtCore import QUrl, QObject, QTimer, QUrlQuery
     from PyQt5.QtCore import pyqtSignal as Signal
     from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
+    from PyQt5.QtWidgets import QApplication
 except ImportError:
-    from PySide6.QtCore import QUrl, QObject, QTimer, Signal
+    from PySide6.QtWidgets import QApplication
+    from PySide6.QtCore import QUrl, QObject, QTimer, Signal, QUrlQuery
     from PySide6.QtNetwork import QNetworkRequest, QNetworkReply, QNetworkAccessManager
 
 
-class QtHttpClient(QObject):
+class QtHttpClient(Handlers):
     error_code = {
         "Connection refused": "SERVER_OFFLINE",
         "Operation canceled": "TIMEOUT_REQUEST",
@@ -22,90 +26,79 @@ class QtHttpClient(QObject):
     }
 
     cancel = Signal(object)
-    downloading_progress = Signal(int)
+    download_progress = Signal(int)
+    retry_failed = Signal(str)
 
-    def __init__(self, access_token="", lang="en", parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent=parent)
-        self.responses = []
-        self.lang = lang
-        self.access_token = access_token
+        self.current_request = {}
         self.network_manager = QNetworkAccessManager()
         self.total_size = 0
 
-    def get(
-            self,
-            url,
-            timeout: int = 3,
-            send_result: Any = None,
-            headers: dict = None
-    ):
-        self.send_request(method="GET", url=url, timeout=timeout, send_result=send_result, headers=headers)
+    def get(self, url: str, data: Union[str, dict, list] = None, send_result: Optional[callable] = None, **kwargs):
+        self.request(method="GET", url=url, parameters=data, send_result=send_result, **kwargs)
 
-    def post(
-            self,
-            url,
-            timeout: int = 3,
-            data: Union[str, dict, list] = None,
-            send_result: Any = None,
-            headers: dict = None
-    ):
-        self.send_request(method="POST", url=url, timeout=timeout, parameters=data, send_result=send_result, headers=headers)
+    def post(self, url: str, data: Union[str, dict, list] = None, send_result: Optional[callable] = None, **kwargs):
+        self.request(method="POST", url=url, parameters=data, send_result=send_result, **kwargs)
 
-    def put(
-            self,
-            url,
-            timeout: int = 3,
-            data: Union[str, dict, list] = None,
-            send_result: Any = None,
-            headers: dict = None
-    ):
-        self.send_request(method="PUT", url=url, timeout=timeout, parameters=data, send_result=send_result, headers=headers)
+    def put(self, url: str, data: Union[str, dict, list] = None, send_result: Optional[callable] = None, **kwargs):
+        self.request(method="PUT", url=url, parameters=data, send_result=send_result, **kwargs)
 
-    def delete(
-            self,
-            url,
-            timeout: int = 3,
-            data: Union[str, dict, list] = None,
-            send_result: str = None,
-            headers: dict = None
-    ):
-        self.send_request(method="DELETE", url=url, timeout=timeout, parameters=data, send_result=send_result, headers=headers)
+    def delete(self, url: str, data: Union[str, dict, list] = None, send_result: Optional[callable] = None, **kwargs):
+        self.request(method="DELETE", url=url, parameters=data, send_result=send_result, **kwargs)
 
-    def send_request(
+    def request(
             self,
             method,
             url: str,
+            request_retries: int = 1,
             parameters: Union[str, dict, list] = None,
             timeout: int = None,
             send_result: Any = None,
             headers: dict = None
     ):
+        self.current_request = {
+            "method": method,
+            "url": url,
+            "request_retries": request_retries,
+            "parameters": parameters,
+            "send_result": send_result,
+            "headers": headers
+        }
+
         if not headers:
-            headers = {}
+            headers = {
+                "User-Agent": "MyApp/1.0",
+                "Accept": "application/json",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Connection": "keep-alive",
+                "Cache-Control": "no-cache"
+            }
 
         url = QUrl(url)
+        if method == "GET" and parameters:
+            query = QUrlQuery()
+            for key, value in parameters.items():
+                query.addQueryItem(key, value)
+            url.setQuery(query)
+
+        elif parameters:
+            parameters = bytes(str(json.dumps(parameters)), encoding="utf-8")
+
         request = QNetworkRequest(url)
-        request.setHeader(QNetworkRequest.ContentTypeHeader, "application/json")
-        if self.access_token:
-            authorization_header = "Bearer " + self.access_token
-            request.setRawHeader(b"Authorization", authorization_header.encode())
-
-        request.setRawHeader(b"User-Agent", b"Application")
-
-        if self.lang:
-            request.setRawHeader(b"Accept-language", self.lang.encode())
-
         for key, param in headers.items():
             request.setRawHeader(key.encode(), param.encode())
 
-        if parameters:
-            data = bytes(str(json.dumps(parameters)), encoding="utf-8")
-        else:
-            data = None
+        self.make_request(
+            method,
+            request,
+            request_retries=request_retries,
+            send_result=send_result,
+            timeout=timeout,
+            data=parameters
+        )
 
-        self.make_request(method, request, send_result=send_result, timeout=timeout, data=data)
-
-    def make_request(self, method, request, send_result=None, timeout=None, data=None, progress=False):
+    def make_request(self, method, request, request_retries, send_result=None, timeout=None, data=None, progress=False):
         if method == "GET" or method == "HEAD":
             reply = self.network_manager.get(request)
         elif method == "POST":
@@ -118,83 +111,17 @@ class QtHttpClient(QObject):
             return
 
         if timeout:
-            # Set a timeout for the request (e.g., 5 seconds)
-            timeout = timeout * 1000
-            timer = QTimer(self)
-            timer.timeout.connect(functools.partial(self.handle_timeout, reply, timer))
-            timer.start(timeout)
+            QTimer.singleShot(timeout * 1000, lambda: reply.abort())
 
         # Connect the finished signal to the function handling the response
         reply.finished.connect(functools.partial(self.handle_response, reply, send_result))
+        reply.error.connect(
+            functools.partial(
+                self.handle_error,
+                reply, method, request, request_retries, send_result, timeout, data, progress
+            )
+        )
+
         if progress is True:
             reply.metaDataChanged.connect(functools.partial(self.update_total_size, reply))
             reply.downloadProgress.connect(self.handle_progress)
-
-    def update_total_size(self, reply):
-        self.total_size = int(reply.header(QNetworkRequest.ContentLengthHeader))
-
-    def handle_progress(self, bytes_received, bytes_total):
-        bytes_total = self.total_size
-
-        if bytes_total <= 0:
-            bytes_total = 1
-        if bytes_received <= 0:
-            bytes_received = 1
-
-        percent = int((bytes_received / bytes_total) * 100)
-        self.downloading_progress.emit(percent)
-
-    def handle_timeout(self, reply, timer):
-        reply.abort()
-        timer.stop()
-        timer.deleteLater()
-
-    def handle_response(self, reply: QNetworkReply, send_result=None):
-        status_code = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute)
-
-        if reply.error() in (QNetworkReply.NetworkError.NoError,):
-            if status_code in (301, 302):
-                # Получаем новый URL из заголовка "Location"
-                redirect_url: QNetworkRequest.Attribute = reply.attribute(QNetworkRequest.RedirectionTargetAttribute)
-
-                if redirect_url.isValid():
-                    # Повторяем запрос с новым URL
-                    self.make_request("GET", QNetworkRequest(redirect_url), send_result=send_result, progress=True)
-                    return
-
-            all_data = reply.readAll()
-            data = all_data.data()
-
-            # Попытка декодировать данные как UTF-8
-            try:
-                decoded_data = data.decode("utf-8")
-                # Попытка сериализовать данные как JSON
-                try:
-                    json_data = json.loads(decoded_data)
-                    result = json_data  # Данные можно сериализовать в JSON
-                except json.JSONDecodeError:
-                    result = decoded_data  # Данные текстовые, но не JSON
-                    if not result:
-                        raise ZeroDivisionError
-            except (UnicodeDecodeError, ZeroDivisionError):
-                result = all_data
-
-            # Передача результата
-            self.cancel.emit(result)
-            if send_result:
-                send_result(result)
-
-        else:
-
-            string = reply.errorString()
-            if status_code == 422:
-                string = "Unprocessable Entity"
-
-            if status_code == 500:
-                string = "INVALID_REQUEST"
-
-            self.error_code[string] if string in self.error_code else print(status_code, string)
-            result = {"error": self.error_code[string] if string in self.error_code else "NOT_FOUND_ERROR"}
-            self.cancel.emit(result)
-            if send_result:
-                send_result(result)

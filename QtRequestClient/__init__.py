@@ -1,1 +1,1 @@
-from .client import QtHttpClient
+from .client import QtHttpClient, QApplication
