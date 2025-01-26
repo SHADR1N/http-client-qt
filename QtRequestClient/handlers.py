@@ -38,12 +38,14 @@ class Utilities:
             try:
                 json_data = json.loads(decoded_data)
                 result = HttpClientResult(
+                    url=reply.url().toString(),
                     type=ResultType.success,
                     status_code=200,
                     json=json_data
                 )
             except json.JSONDecodeError:
                 result = HttpClientResult(
+                    url=reply.url().toString(),
                     type=ResultType.success,
                     status_code=200,
                     text=decoded_data
@@ -52,6 +54,7 @@ class Utilities:
                     raise ZeroDivisionError
         except (UnicodeDecodeError, ZeroDivisionError):
             result = HttpClientResult(
+                url=reply.url().toString(),
                 type=ResultType.success,
                 status_code=200,
                 bytes=all_data
@@ -116,6 +119,7 @@ class Handlers(QObject, Utilities):
 
         else:
             result = HttpClientResult(
+                url=reply.url().toString(),
                 type=ResultType.error,
                 status_code=status_code,
                 text=string_code or reply.errorString()

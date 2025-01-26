@@ -25,6 +25,7 @@ class ErrorCode(Enum):
 @dataclass
 class HttpClientResult:
     type: ResultType
+    url: str = field(default_factory=str)
     status_code: int = field(default_factory=int)
     text: str = field(default_factory=str)
     json: dict = field(default_factory=dict)
