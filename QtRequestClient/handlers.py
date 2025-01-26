@@ -124,7 +124,7 @@ class Handlers(QObject, Utilities):
                 status_code=status_code,
                 text=string_code or reply.errorString()
             )
-            self.result.emit(result)
+            return self.retry_failed.emit(result)
 
         if send_result:
             send_result(result)
