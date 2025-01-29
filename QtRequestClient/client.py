@@ -7,7 +7,7 @@ from QtRequestClient.handlers import Handlers
 from QtRequestClient.logger import logger
 
 try:
-    from PyQt5.QtCore import QUrl, QObject, QTimer, QUrlQuery
+    from PyQt5.QtCore import QUrl, QObject, QTimer, QUrlQuery, QEventLoop
     from PyQt5.QtCore import pyqtSignal as Signal
     from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
     from PyQt5.QtWidgets import QApplication
@@ -134,3 +134,7 @@ class QtHttpClient(Handlers):
         if progress is True:
             reply.metaDataChanged.connect(functools.partial(self.update_total_size, reply))
             reply.downloadProgress.connect(self.handle_progress)
+
+        reply.finished.connect(lambda: timer.stop())
+        reply.error.connect(lambda: timer.stop())
+        reply.aboutToClose.connect(lambda: timer.stop())
