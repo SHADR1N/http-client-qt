@@ -1,6 +1,7 @@
 import json
 
 from QtRequestClient.entity import ErrorCode, HttpClientResult, ResultType
+from QtRequestClient.logger import logger
 
 try:
     from PyQt5.QtCore import QUrl, QObject, QTimer, QUrlQuery
@@ -83,6 +84,7 @@ class Handlers(QObject, Utilities):
     def handle_error(self, reply: QNetworkReply, method, request, request_retries, send_result, timeout, data, progress, error=None):
         if request_retries is None: request_retries = 0
         request_retries -= 1
+        logger.debug(f"Attempting {request_retries} to execute request")
 
         if request_retries > 0:
             self.current_request.update({"request_retries": request_retries})

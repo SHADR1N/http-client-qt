@@ -1,10 +1,10 @@
-import sys
+import functools
 import functools
 import json
-
-from typing import Any, Union, Callable, Optional
+from typing import Any, Union, Optional
 
 from QtRequestClient.handlers import Handlers
+from QtRequestClient.logger import logger
 
 try:
     from PyQt5.QtCore import QUrl, QObject, QTimer, QUrlQuery
@@ -36,15 +36,19 @@ class QtHttpClient(Handlers):
         self.total_size = 0
 
     def get(self, url: str, data: Union[str, dict, list] = None, send_result: Optional[callable] = None, **kwargs):
+        logger.debug(f"New request GET with url={url}")
         self.request(method="GET", url=url, parameters=data, send_result=send_result, **kwargs)
 
     def post(self, url: str, data: Union[str, dict, list] = None, send_result: Optional[callable] = None, **kwargs):
+        logger.debug(f"New request POST with url={url}")
         self.request(method="POST", url=url, parameters=data, send_result=send_result, **kwargs)
 
     def put(self, url: str, data: Union[str, dict, list] = None, send_result: Optional[callable] = None, **kwargs):
+        logger.debug(f"New request PUT with url={url}")
         self.request(method="PUT", url=url, parameters=data, send_result=send_result, **kwargs)
 
     def delete(self, url: str, data: Union[str, dict, list] = None, send_result: Optional[callable] = None, **kwargs):
+        logger.debug(f"New request DELETE with url={url}")
         self.request(method="DELETE", url=url, parameters=data, send_result=send_result, **kwargs)
 
     def request(
@@ -108,9 +112,11 @@ class QtHttpClient(Handlers):
         elif method == "DELETE":
             reply = self.network_manager.deleteResource(request)
         else:
+            logger.critical(f"Request method {method} not supported.")
             return
 
         if timeout:
+            logger.debug(f"Added time limit for request {timeout} seconds.")
             QTimer.singleShot(timeout * 1000, lambda: reply.abort())
 
         # Connect the finished signal to the function handling the response
