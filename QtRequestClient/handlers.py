@@ -105,6 +105,8 @@ class Handlers(QObject, Utilities):
 
     def handle_response(self, reply: QNetworkReply, send_result=None):
         status_code = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute)
+        logger.debug(f"Handle response with status code {status_code} - {reply.url().toString()}")
+
         if status_code == 422:
             string_code = ErrorCode.unprocessable_entities
         elif status_code == 500:
@@ -113,13 +115,20 @@ class Handlers(QObject, Utilities):
             string_code = None
 
         if reply.error() in (QNetworkReply.NetworkError.NoError,):
-            if status_code in (301, 302):
+            logger.debug(f"Handle response with NOT error {reply.url().toString()}")
+
+            if (
+                    status_code in (301, 302)
+                    and [i for i in self.ignore_redirect if i in reply.url().toString()]
+            ):
                 return self.handle_allowed_redirect(reply, send_result)
 
             result = self.unparse_result(reply)
             self.result.emit(result)
 
         else:
+            logger.critical(f"Handle response with error {reply.url().toString()}")
+
             result = HttpClientResult(
                 url=reply.url().toString(),
                 type=ResultType.error,

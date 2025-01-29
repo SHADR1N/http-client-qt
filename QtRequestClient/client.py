@@ -29,8 +29,8 @@ class QtHttpClient(Handlers):
     retry_failed = Signal(object)
     download_progress = Signal(int)
 
-    def __init__(self, parent=None):
-        super().__init__(parent=parent)
+    def __init__(self, parent=None, ignore_redirect=None):
+        super().__init__(parent=parent, ignore_redirect=ignore_redirect)
         self.current_request = {}
         self.network_manager = QNetworkAccessManager()
         self.total_size = 0
@@ -117,9 +117,9 @@ class QtHttpClient(Handlers):
 
         if timeout:
             logger.debug(f"Added time limit for request {timeout} seconds.")
-            timer = QTimer()
+            timer = QTimer(self)
             timer.setSingleShot(True)
-            timer.timeout.connect(lambda: reply.abort())
+            timer.timeout.connect(lambda: (logger.debug("Made request aborting..."), reply.abort()))
             timer.start(timeout * 1000)
 
         # Connect the finished signal to the function handling the response
