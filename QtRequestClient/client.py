@@ -117,7 +117,10 @@ class QtHttpClient(Handlers):
 
         if timeout:
             logger.debug(f"Added time limit for request {timeout} seconds.")
-            QTimer.singleShot(timeout * 1000, lambda: reply.abort())
+            timer = QTimer()
+            timer.setSingleShot(True)
+            timer.timeout.connect(lambda: reply.abort())
+            timer.start(timeout * 1000)
 
         # Connect the finished signal to the function handling the response
         reply.finished.connect(functools.partial(self.handle_response, reply, send_result))

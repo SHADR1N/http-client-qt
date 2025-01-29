@@ -14,7 +14,7 @@ else:
 
 setup(
     name='qt-request-client',
-    version='0.1.4',
+    version='0.1.5',
     author='SHADRIN',
     author_email='none@gmail.com',
     license='MIT',
