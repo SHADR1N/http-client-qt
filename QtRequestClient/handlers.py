@@ -13,7 +13,7 @@ except ImportError:
 
 
 class Utilities:
-    def update_total_size(self, reply):
+    def update_total_size(self, reply, *_):
         if reply.header(QNetworkRequest.ContentLengthHeader):
             self.total_size = int(reply.header(QNetworkRequest.ContentLengthHeader))
 
@@ -21,9 +21,11 @@ class Utilities:
         bytes_total = self.total_size
 
         if bytes_total <= 0:
-            bytes_total = 1
+            bytes_total = None
         if bytes_received <= 0:
-            bytes_received = 1
+            bytes_received = None
+        if bytes_received is None or bytes_total is None:
+            return
 
         percent = int((bytes_received / bytes_total) * 100)
         self.download_progress.emit(percent)

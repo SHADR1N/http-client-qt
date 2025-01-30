@@ -115,9 +115,9 @@ class QtHttpClient(Handlers):
             logger.critical(f"Request method {method} not supported.")
             return
 
+        timer = QTimer(self)
         if timeout:
             logger.debug(f"Added time limit for request {timeout} seconds.")
-            timer = QTimer(self)
             timer.setSingleShot(True)
             timer.timeout.connect(lambda: (logger.debug("Made request aborting..."), reply.abort()))
             timer.start(timeout * 1000)
@@ -131,9 +131,8 @@ class QtHttpClient(Handlers):
             )
         )
 
-        if progress is True:
-            reply.metaDataChanged.connect(functools.partial(self.update_total_size, reply))
-            reply.downloadProgress.connect(self.handle_progress)
+        reply.metaDataChanged.connect(functools.partial(self.update_total_size, reply))
+        reply.downloadProgress.connect(self.handle_progress)
 
         reply.finished.connect(lambda: timer.stop())
         reply.error.connect(lambda: timer.stop())
