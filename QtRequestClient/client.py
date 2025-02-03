@@ -27,7 +27,6 @@ class QtHttpClient(Handlers):
 
     cancel = Signal(object)
     retry_failed = Signal(object)
-    download_progress = Signal(int)
 
     def __init__(self, parent=None, ignore_redirect=None):
         super().__init__(parent=parent, ignore_redirect=ignore_redirect)

@@ -21,14 +21,11 @@ class Utilities:
         bytes_total = self.total_size
 
         if bytes_total <= 0:
-            bytes_total = None
+            bytes_total = 0
         if bytes_received <= 0:
-            bytes_received = None
-        if bytes_received is None or bytes_total is None:
-            return
+            bytes_received = 0
 
-        percent = int((bytes_received / bytes_total) * 100)
-        self.download_progress.emit(percent)
+        self.download_progress.emit(bytes_received, bytes_total)
 
     def unparse_result(self, reply: QNetworkReply):
         all_data = reply.readAll()
@@ -67,7 +64,7 @@ class Utilities:
 
 class Handlers(QObject, Utilities):
     exception = Signal(object)
-    download_progress = Signal(int)
+    download_progress = Signal(int, int)
     upload_progress = Signal(int)
     result = Signal(object)
 
