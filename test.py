@@ -43,7 +43,7 @@ if __name__ == "__main__":
     app = QApplication([])
     with QtHttpClient(parent=app) as client:
         client.get(
-            url="http://127.0.0.1:8000/",
+            url="https://github.com/SHADR1N/telespace-application/commits/macos-arm-beta/",
             timeout=5,
             retries=3,
         )
