@@ -1,19 +1,52 @@
 import sys
+import json
+import threading
+import time
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from QtRequestClient import QtHttpClient, QApplication
 
-app = QApplication([])
+# 1) Определяем свой простой handler, который на любой GET отдаёт JSON
+class TestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        time.sleep(3)
+        # формируем тестовый объект
+        payload = {
+            "status": "ok",
+            "message": "Привет от моего тестового сервера!"
+        }
+        data = json.dumps(payload).encode('utf-8')
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        except:
+            pass
 
-# with QtHttpClient(parent=app) as client:
-#     client.get(url="https://script.googleusercontent.com/macros/echo?user_content_key=xALHHk9bfBevJp6ne9N6aw494fVahHiO8cIcyGqRd2kgt83zBlW7Ibb17EwgnFipHY6ogxvdiPgpKujZlxLyjf2q5ArNGrJvm5_BxDlH2jW0nuo2oDemN9CCS2h10ox_1xSncGQajx_ryfhECjZEnJ9GRkcRevgjTvo8Dc32iw_BLJPcPfRdVKhJT5HNzQuXEeN3QFwl2n0M6ZmO-h7C6bwVq0tbM60-YSRgvERRRx91eQMV9hTntRGQmSuaYtHQ&lib=MwxUjRcLr2qLlnVOLh12wSNkqcO1Ikdrk", request_retries=3, send_result=lambda e: print(e))
-#     client.get(url="https://telegram.org/", request_retries=3, send_result=lambda e: print("Telegram completed."))
+    # чтобы не засорять консоль логами:
+    def log_message(self, format, *args):
+        pass
 
-with QtHttpClient(parent=app) as client:
-    client.get(
-        url="https://github.com/SHADR1N/http-client-qt/commits/main/",
-        send_result=lambda e: print(e.json),
-        timeout=5,
-        request_retries=3
-    )
 
-sys.exit(app.exec_())
+def run_test_server(port=8000):
+    server = HTTPServer(('127.0.0.1', port), TestHandler)
+    server.serve_forever()
+
+if __name__ == "__main__":
+    # 2) Стартуем сервер в фоне
+    server_thread = threading.Thread(target=run_test_server, args=(8000,), daemon=True)
+    server_thread.start()
+
+    # 3) Запускаем Qt‑приложение и делаем запрос
+    app = QApplication([])
+    with QtHttpClient(parent=app) as client:
+        client.get(
+            url="http://127.0.0.1:8000/",
+            timeout=5,
+            retries=3,
+        )
+        client.requestCompleted.connect(lambda e: print(e))
+
+    sys.exit(app.exec_())
